@@ -88,7 +88,7 @@ class Client():
             print(gateway.address,':',gateway.ts,':',float(lat), ':', int(status))
     
     def pingTest(self, address):
-        response = subprocess.call(['ping', '-q', '-c', '1', '-w','5',address], stdout=subprocess.DEVNULL)
+        response = subprocess.call(['ping', '-q', '-c', '1', '-w','5',address], stdout=PIPE)
         if response == 0:
             return True
         else:
