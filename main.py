@@ -88,7 +88,7 @@ class Client():
             print(gateway.address,':',gateway.ts,':',float(lat), ':', int(status))
     
     def pingTest(self, address):
-        response = subprocess.call(['ping', '-q', '-c', '1', '-w','5',address], stdout=PIPE)
+        response = subprocess.call(['ping', '-q', '-c', '1', '-w','5',address], stdout=subprocess.DEVNULL)
         if response == 0:
             return True
         else:
@@ -148,7 +148,11 @@ class Client():
         self.defaultGateway = selected
     
     def selectNext(self):
-        self.defaultGateway = self.gateways[0]
+        if(self.gateways[0].address == self.defaultGateway.address):
+            self.defaultGateway = self.gateways[0]
+            self.gateways.remove(self.gateways[0])
+            self.append(self.defaultGateway)        
+        self.defaultGateway = self.gateways[1]
         
     
     def connect(self):
@@ -159,7 +163,7 @@ class Client():
             self.selectNext()
         print('Connecting to:', self.defaultGateway.address)
         
-        threading.Timer(180.0, self.connect).start()
+        threading.Timer(60.0, self.connect).start()
         cmd='''curl -x '''+self.defaultGateway.address+''':3128 -U david.pinilla:"|Jn 5DJ\\7inbNniK|m@^ja&>C" -m 180 -w %{time_starttransfer},%{time_total},%{http_code} http://ovh.net/files/1Mb.dat -o /dev/null -s'''
         command = Popen(shlex.split(cmd),stdout=PIPE, stderr=PIPE)
         stdout, stderr = command.communicate()
@@ -168,12 +172,16 @@ class Client():
             print('removing ',':', self.defaultGateway.address)
             self.removeGateway(self.defaultGateway)
             self.selectNext()
+        elif(int(status)!= 200):
+            print('changing GW ERROR ',':', self.defaultGateway.address)
+            self.selectNext()
         else:
             self.defaultGateway.ts = datetime.datetime.now()
             self.defaultGateway.latency = float(lat)      
             self.setCategory(self.defaultGateway)
-        print(self.defaultGateway.address,':',self.defaultGateway.ts,':',float(lat), ':', int(status))
-        
+        with open('download_manual','a') as f:
+            f.write("{0},{1},{2},{3}\n".format(self.defaultGateway.ts,
+                                                   self.defaultGateway.address,float(lat),int(status)))
         
                 
 node1 = Gateway('10.139.40.85', 0.15, '2018 Feb 15 18:59:15', False)
