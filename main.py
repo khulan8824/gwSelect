@@ -202,7 +202,7 @@ node9 = Gateway('10.138.62.2', 0.04, '2018 Feb 15 19:47:59', False)
 node10 = Gateway('10.138.25.67', 0.09, '2018 Feb 15 17:59:07', False)
 
 
-client4= Client('10.139.40.77', [], [node1,node2,node4, node8, node9, node10, node6,node7, node5, node3], node9)
+client4= Client('10.139.40.77', [], [node4, node8, node9, node1,node10, node6,node2,node7, node5, node3], node9)
 for gw in client4.gateways:
     if client4.pingTest(gw.address) is False:
         if gw.address == client4.defaultGateway.address:
