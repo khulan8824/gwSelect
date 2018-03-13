@@ -96,7 +96,7 @@ class Client():
             self.setCategory(gateway)
     
     def pingTest(self, address):
-        response = subprocess.call(['ping', '-q', '-c', '1', '-w','5',address], stdout=subprocess.DEVNULL)
+        response = subprocess.call(['ping', '-q', '-c', '1', '-w','5',address], stdout=subprocess.PIPE)
         if response == 0:
             return True
         else:
