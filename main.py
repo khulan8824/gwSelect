@@ -79,7 +79,7 @@ class Client():
         stdout, stderr = command.communicate()
         lat, status = stdout.decode("utf-8").split(',')
         if(int(status) != 200):            
-            with open('log_output','a') as f:                
+            with open('log','a') as f:                
                 f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', removing:'+gateway.address+'\n')
             self.removeGateway(gateway)
         else:
@@ -100,7 +100,7 @@ class Client():
         goodGateways = [gw for gw in self.gateways if gw.status is True]
         print(len(goodGateways))
         for randomGw in self.select2Random(goodGateways):            
-            with open('log_output','a') as f:                
+            with open('log','a') as f:                
                 f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', pinging good: '+randomGw.address+'\n')
             self.pingGateway(randomGw)
 
@@ -109,7 +109,7 @@ class Client():
         badGateways = [gw for gw in self.gateways if gw.status is False]
         print(len(badGateways))
         for randomGw in self.select2Random(badGateways):
-            with open('log_output','a') as f:                
+            with open('log','a') as f:                
                 f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', pinging bad: '+randomGw.address+'\n' )
             self.pingGateway(randomGw)
     
@@ -160,7 +160,7 @@ class Client():
         #Checking if gw is responsive, connectable
         if self.pingTest(self.defaultGateway.address) is False:
             with open('log', 'a') as f:
-                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+':  Changing the unresponsive gw::'+self.defaultGateway.address)
+                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+':  Changing the unresponsive gw:'+self.defaultGateway.address+'\n')
                 f.close()
             self.selectNext()
             return             
@@ -171,14 +171,14 @@ class Client():
         ttfb, lat, status = stdout.decode("utf-8").split(',')
         if(int(status) == 0):
             with open('log', 'a') as f:
-                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+': Return status 0:'+self.defaultGateway.address)
+                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+': Return status 0:'+self.defaultGateway.address+'\n')
                 f.close()
             #self.removeGateway(self.defaultGateway)
             self.selectNext()
             return
         elif(int(status)!= 200):
             with open('log', 'a') as f:
-                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+': changing GW ERROR'+self.defaultGateway.address)
+                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+': changing GW ERROR: '+self.defaultGateway.address+'\n')
                 f.close()
             self.selectNext()
             return
@@ -210,6 +210,6 @@ for gw in client4.gateways:
         client4.removeGateway(gw)
         
 with open('log', 'a') as f:
-    f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+': Connecting with '+str(len(client4.gateways))+' gateways')
+    f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+': Connecting with '+str(len(client4.gateways))+' gateways\n')
     f.close()
 client4.connect()
