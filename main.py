@@ -17,17 +17,6 @@ class Gateway():
         self.ts = ts
         self.status = status
         
-#repr, cmp and getKey are the helper functions for sorting Gateway class objects
-    def __repr__(self):
-        return '{}, {},{}, {}'.format(self.__class__.__name__, self.ts, self.address, self.latency)
-    
-    def __cmp__(self, other):
-        if hasattr(other, 'latency'):
-            return self.latency.__cmp__(other.latency)
-    
-    def getKey(self):
-        return self.latency
-        
     def setStatus(self, status):
         self.status=status
     
