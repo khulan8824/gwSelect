@@ -38,6 +38,9 @@ class Gateway():
     
     def getTimestamp(self):
         return self.ts
+    
+    def printInformation(self):
+        print(self.address,':',str(self.latency), ':', self.ts.strftime("%Y-%m-%d %H:%M:%S"))
 
 # Client node information    
 class Client():
@@ -50,6 +53,7 @@ class Client():
     lastProbingTs = None
     similarityMatrix = {} # Save information about similarity of neighbours
     senseLatency = 60
+    updatedGateways = []
     
     def __init__(self, address, neighbours = [], gateways = [], defaultGateway = None):
         self.address = address
@@ -80,14 +84,21 @@ class Client():
         if(gateway in self.gateways):
             self.gateways.remove(gateway)
     
-    def updateGateway(self, gateway):
-        gw = next(x for x in self.gateways if x.address == gateway.address)
+    
+    def updateGateway(self, gateways):
+        for x in gateways:
+            for gw in self.gateways:
+                if x.address == gw.address:
+                    gw = x
+                    break
     
     def printGatewayInformation(self):
-        print('Total number:', len(self.gateways))
-        for gw in self.gateways:
-            print(gw.address,':',str(gw.latency),':', gw.ts.strftime("%Y-%m-%d %H:%M:%S"),':', str(gw.status))
-            
+         with open('log','a') as f:      
+            f.write('Total number:' +str(len(self.gateways))+'\n')                
+            for gw in self.gateways:
+                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+','+gw.address+':'+str(gw.latency)+':'+ gw.ts.strftime("%Y-%m-%d %H:%M:%S")+':'+str(gw.status)+'\n')
+                    
+    #MONITORING GW PERFORMANCE BY SENDING PROBING PACKET        
     def pingGateway(self, gateway):
         status = True
         cmd='''curl -x '''+gateway.address+''':3128 -U david.pinilla:"|Jn 5DJ\\7inbNniK|m@^ja&>C" -m 180 -w %{time_total},%{http_code} http://ovh.net/files/1Mb.dat -o /dev/null -s'''
@@ -95,7 +106,7 @@ class Client():
         stdout, stderr = command.communicate()
         lat, status = stdout.decode("utf-8").split(',')
         if(int(status) == 0):            
-            with open('log_output','a') as f:                
+            with open('log','a') as f:                
                 f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', removing:'+gateway.address+'\n')
             self.removeGateway(gateway)
             status = False
@@ -105,10 +116,10 @@ class Client():
             status = False
         else:
             gateway.ts = datetime.datetime.now()
-            gateway.latency = float(lat)
-        
+            gateway.latency = float(lat)        
         return status
     
+    #CHECK IF GW IS RESPONSIVE/CONNECTABLE
     def pingTest(self, address):
         response = subprocess.call(['ping', '-q', '-c', '1', '-w','5',address], stdout=PIPE)
         if response == 0:
@@ -116,7 +127,7 @@ class Client():
         else:
             return False
       
-        
+    #SELECT BEST GW FROM THE GIVEN GWS BY PINGING
     def selectBest(self, gws):
         if len(gws) == 1:
             self.defaultGateway = gws[0]
@@ -130,11 +141,13 @@ class Client():
         else:
             self.defaultGateway = gws[0]
         
+        #add latest information of probed gws into separate list
+        #self.updatedGateways = gws
+        self.updatedGateways.extend(gws)
         return True
     
-    #GATEWAY SELECTION LOGIC
+    #SAMPLE 2 RANDOM GATEWAYS
     def select2Random(self):
-        #return random.sample(set([gw for gw in gateways if gw.status is True]), 2)
         status = True
         if len(self.gateways)>2:               
             return random.sample(set(self.gateways), 2)
@@ -147,7 +160,11 @@ class Client():
         while(status is not True):
             status =self.selectBest(self.select2Random())
         self.gateways.sort(key=lambda x: (x.latency, x.ts), reverse=False)
-        self.printGatewayInformation()
+        
+        for client in self.neighbours:
+            self.similarityMatrix[client.address] = self.findSimilarity(client)
+        
+        self.printInformation()
 
     def connect(self):
         threading.Timer(60.0, self.connect).start()        
@@ -156,11 +173,11 @@ class Client():
         command = Popen(shlex.split(cmd),stdout=PIPE, stderr=PIPE)
         stdout, stderr = command.communicate()
         ttfb, lat, status = stdout.decode("utf-8").split(',')
-        #print(datetime.datetime.now(),self.round, self.defaultGateway.address,float(lat),int(status))
         with open('download_random2_cluster','a') as f:
             f.write("{0},{1},{2},{3},{4}\n".format(datetime.datetime.now(),self.round,
                                                    self.defaultGateway.address,float(lat),int(status)))
         self.round += 1
+        #self.printInformationConsole()
         
     
     def findSimilarity(self, client):
@@ -180,43 +197,80 @@ class Client():
                 i +=1
             else:
                 break
-        #print('Similarity:', count/iterCount)
+        if iterCount == 0:
+            return 0
         return float(count)/float(iterCount)
 
         
     def sendNeighbour(self):
+        text = self.sendInformation()
+        self.updatedGateways = []
         for neighbour in self.neighbours:
-            print('Sending to:',self.round, ':', neighbour.address)
             f = protocol.ClientFactory()
             f.protocol = MessageClientProtocol
             f.protocol.client = self
             f.protocol.mode='client'
+            f.protocol.text = text
             f.protocol.addr = neighbour.address
             reactor.connectTCP(neighbour.address, 5555, f)
         self.round +=1
+        
+        #Calling information sending function again after sensing latency time
         reactor.callLater(self.senseLatency,self.sendNeighbour)
 
+    #updating client information of changed gateways
     def updateGateways(self, gateways):
-        self.gateways = gateways
+        for gw in gateways:
+            i =0
+            for clGW in self.gateways:
+                if clGW.address == gw.address:
+                    clGW = gw
+                    i +=1
+                    break
+            if i == 0:
+                self.gateways.append(gw)
+            
     
     def printInformation(self):
+        with open('log','a') as f:  
+            f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', '+str(self.round)+',Address:'+ self.address+'\n')
+            for gw in self.gateways:
+                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', '+gw.address+':'+ str(gw.latency)+':'+gw.ts.strftime("%Y-%m-%d %H:%M:%S")+'\n')
+            f.write('Similarity matrix\n')
+            for k, v in self.similarityMatrix.items():
+                f.write(k+'>'+str(v)+'\n')
+            if self.defaultGateway is not None:
+                f.write('Default gateway: '+self.defaultGateway.address+'\n')
+
+    def printInformationConsole(self):
         print('Address:', self.address)
         for gw in self.gateways:
             print(gw.address, ':', str(gw.latency),':',gw.ts)
-        
-        print('Similarity matrix')
+
+        print('Similarity matrix of:'+self.address)
         for k, v in self.similarityMatrix.items():
             print(k, '>', v)
         if self.defaultGateway is not None:
             print('Default gateway:', self.defaultGateway.address)
-    
+        
+
     def sendInformation(self):
         info = ""
+        #sending updated information, not all information
+        print("FROM SEND INFO:", len(self.updatedGateways))
+        for gw in self.updatedGateways:
+            if info != "":
+                info += ","
+            info += gw.address+'#'+str(gw.latency)+'#'+gw.ts.strftime("%Y-%m-%d %H:%M:%S")        
+        return info
+
+    def sendAllInformation(self):
+        info = ""
+        #sending updated information, not all information
         for gw in self.gateways:
             if info != "":
                 info += ","
-            info += gw.address+'#'+str(gw.latency)+'#'+gw.ts.strftime("%Y-%m-%d %H:%M:%S")
-        
+            info += gw.address+'#'+str(gw.latency)+'#'+gw.ts.strftime("%Y-%m-%d %H:%M:%S")        
         return info
     
 #SERVER SECTION
@@ -224,34 +278,38 @@ class MessageServerProtocol(Protocol):
     client = None
     
     def connectionMade(self):
-        print('Server started running at: ', self.client.address)
+        with open('log','a') as f:  
+            f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', Server started running at: '+ self.client.address+'\n')
 
     # When receiving data from the client, it should update neighbour information
     def dataReceived(self,data):
         connected = self.transport.getPeer().host
-        print('Connection received from:', connected)
+        with open('log','a') as f:  
+            f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', Connection received from:'+ connected+'\n')
         if self.client is not None:
+            print('Connection received:'+connected)
             nlist = data.decode('utf-8').split(',')
             gateways = []
             for gwInfo in nlist:
                 address, latency, ts = gwInfo.split('#')
-                gateways.append(Gateway(str(address), float(latency), datetime.datetime.strptime(ts,'%Y-%m-%d %H:%M:%S'), False))
+                gwTemp =Gateway(str(address), float(latency), datetime.datetime.strptime(ts,'%Y-%m-%d %H:%M:%S'), False)
+                gateways.append(gwTemp)
+                
             
             status = False
             #searching for neighbour to update received information
             for nb in self.client.neighbours:
                 if nb.address == connected:
                     nb.updateGateways(gateways)
-                    nb.printInformation()
                     status = True
-                    #Updating similarity matrix information
-                    self.client.similarityMatrix[nb.address] = self.client.findSimilarity(nb)
+                    #nb.printInformation()
+                    #nb.printInformationConsole()
                     break
 
     def connectionLost(self, reason):
-        print("Server connection lost")
+        with open('log','a') as f:  
+            f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', Server connection lost\n')
         reactor.callFromThread(reactor.stop)
-
         if reactor.running:
                 reactor.stop()
         os._exit(0)
@@ -262,22 +320,24 @@ class MessageServerProtocol(Protocol):
 class MessageClientProtocol(Protocol):    
     client = None
     addr = ""
-    
+    status = False
+    text = ""
     def connectionMade(self):
         if self.client is not None:
-            text = self.client.sendInformation()
-            if text != "":
-                self.transport.write(text.encode())
+            if self.text != "":
+                print("Sending:"+self.text)
+                self.transport.write(self.text.encode())
             else:
-                print("No information to write")
+                with open('log','a') as f:  
+                    f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', No information to write\n')
 
     
     def connectionLost(self, reason):
-        print("Connection lost:", reason)
+        with open('log','a') as f:  
+            f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', Client connection lost: '+self.addr+'\n')
         if self.addr != "":
-                self.client.similarityMatrix[self.addr] = 0
-                print(self.addr, ':', 0)
-
+            self.client.similarityMatrix[self.addr] = 0
+                
 
 node1 = Gateway('10.139.40.85', 0.15, datetime.datetime.strptime('2018-02-15 18:59:15', '%Y-%m-%d %H:%M:%S'), False)
 node2 = Gateway('10.139.40.122', 0.20, datetime.datetime.strptime('2018-02-15 18:20:15', '%Y-%m-%d %H:%M:%S'),False)
@@ -290,21 +350,22 @@ node8 = Gateway('10.139.37.194', 1.5, datetime.datetime.strptime('2018-02-15 18:
 node9 = Gateway('10.138.62.2', 0.04, datetime.datetime.strptime('2018-02-15 19:47:59', '%Y-%m-%d %H:%M:%S'), False)
 node10 = Gateway('10.138.25.67', 0.09, datetime.datetime.strptime('2018-02-15 17:59:07', '%Y-%m-%d %H:%M:%S'), False)
 
-listGW = [node2, node4, node5, node8, node9, node10, node6,node7, node3]
+listGW = [node2, node3, node6, node7, node8, node9, node10]
 
 neighbour1 = Client('10.228.207.66',[],[],None)
 neighbour2 = Client('10.228.207.65',[],[],None)
 neighbour3 = Client('10.139.40.87',[],[],None)
 neighbour4 = Client('10.139.94.108',[],[],None)
 
-client4= Client('10.228.207.65', [neighbour1, neighbour2, neighbour3, neighbour4], listGW, node7)
+client4= Client('10.228.207.204', [neighbour1, neighbour2, neighbour3, neighbour4], listGW, node7)
+client4.senseLatency = 300
 
 for gw in client4.gateways:
     if client4.pingTest(gw.address) is False:
         client4.removeGateway(gw)
 
 client4.senseGateways()
-#client4.connect()
+client4.connect()
 
 if reactor.running:
     reactor.stop()
