@@ -25,7 +25,7 @@ class ClientManager():
     round = 0
     clientCount = 0
     proxyCount = 0
-    receivedCount = 0
+    lastSenseTS = None
 
     def __init__(self, client, neighbours, gateways):
         self.client = client
@@ -45,13 +45,6 @@ class ClientManager():
         if(gateway in self.gateways):
             self.gateways.remove(gateway)
 
-    def addReceivedCount(self):
-        self.receivedCount += 1
-    def addClientCount(self):
-        self.clientCount += 1
-    def addProxyCount(self):
-        self.proxyCount +=1
-    
     def updateGateways(self, gateways):
         for gw in gateways:
             if self.checkGatewayExists(gw):
@@ -59,7 +52,7 @@ class ClientManager():
                     if gw.address == clientGw.address:
                         if gw.ts > clientGw.ts:
                             clientGw.changeInformation(gw.latency, gw.ts)
-                            #print("Updated new information:", clientGw.address,":", clientGw.ts)
+                            print("Updated new information:", clientGw.address,":", clientGw.ts)
                         break
             else:
                 print('Adding new gateway:', gw.address)
@@ -83,7 +76,7 @@ class ClientManager():
     def selectBest(self, gws):
         if len(gws) == 1:
             self.client.defaultGateway = gws[0]
-            self.addProxyCount()
+	    self.proxyCount +=1
             return True
         
         for gw in gws:
@@ -94,8 +87,7 @@ class ClientManager():
         for gw in gws:
             if best.latency > gw.latency:
                 best = gw
-        self.addProxyCount()
-        self.addProxyCount()
+        self.proxyCount += 1
         self.client.defaultGateway = best
         
         #add latest information of probed gws into separate list
@@ -151,7 +143,7 @@ class ClientManager():
             f.protocol.text = text
             f.protocol.addr = neighbour.address
             reactor.connectTCP(neighbour.address, 5555, f)
-            self.addClientCount()
+            self.clientCount +=1
         self.round +=1
         
     def senseGateways(self):
@@ -205,5 +197,6 @@ class ClientManager():
         else:
             gateway.ts = datetime.datetime.now()
             gateway.latency = float(lat)        
+	self.
         return status
     

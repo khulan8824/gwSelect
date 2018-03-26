@@ -42,6 +42,10 @@ class Client():
 
     def printInformationConsole(self):
         print('Address:', self.address)
+        print('Round:', self.cManager.round)
+        print('Client to proxy count:',self.cManager.proxyCount)
+        print('Client to client count:',self.cManager.clientCount)
+        print('Client received count:', self.cManager.receivedCount)
         for gw in self.cManager.gateways:
             print(gw.address, ':', str(gw.latency),':',gw.ts)
             

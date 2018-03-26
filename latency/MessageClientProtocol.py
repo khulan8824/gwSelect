@@ -20,12 +20,12 @@ class MessageClientProtocol(Protocol):
     def connectionMade(self):
         if self.client is not None:
             if self.text != "":
-                print("Sending:"+self.text)
+                #print("Sending:"+self.text)
                 self.transport.write(self.text.encode())
             else:
                 print('No information to write')
 
     
-    def connectionLost(self, reason):
-        with open('log','a') as f:  
-            f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', Client connection lost: '+self.addr+'\n')
+    #def connectionLost(self, reason):
+    #    with open('log','a') as f:  
+    #        f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', Client connection lost: '+self.addr+'\n')
