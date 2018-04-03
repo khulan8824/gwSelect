@@ -15,8 +15,8 @@ import Gateway as gw
 class MessageServerProtocol(Protocol):
     client = None
     
-    #def connectionMade(self):
-    #    print('Server started running at: '+ self.client.address+'\n')
+    def connectionMade(self):
+        print('Server started running at: '+ self.client.address+'\n')
 
     # When receiving data from the client, it should update neighbour information
     def dataReceived(self,data):
@@ -24,15 +24,14 @@ class MessageServerProtocol(Protocol):
         connected = self.transport.getPeer().host
         
         if self.client is not None:
-            #print('Connection received:'+connected)
-            #self.client.cManager.addReceivedCount()
+            print('Connection received:'+connected)
+            self.client.cManager.addReceivedCount()
             nlist = data.decode('utf-8').split(',')
             gateways = []
             for gwInfo in nlist:
-                address, latency, ts = gwInfo.split('#')
+self.client.cManager.addReceivedCount()                address, latency, ts = gwInfo.split('#')
                 gwTemp =gw.Gateway(str(address), float(latency), datetime.datetime.strptime(ts,'%Y-%m-%d %H:%M:%S'), False)
                 gateways.append(gwTemp)
-                self.client.cManager.addReceivedCount()
                 
             self.client.cManager.updateGateways(gateways)
             status = False
