@@ -20,16 +20,22 @@ class MessageServerProtocol(Protocol):
 
     # When receiving data from the client, it should update neighbour information
     def dataReceived(self,data):
-        #print("DATA:", data)
+        print("DATA:", data)
         connected = self.transport.getPeer().host
         
         if self.client is not None:
             print('Connection received:'+connected)
+            #If information received from the unlisted new close neighbour 
+            #then add it to the close neighbouring list
+            if self.client.cManager.isNeighbourExists(connected) is False:
+                self.client.cManager.addCloseNeigbour(connected)
+            
             self.client.cManager.addReceivedCount()
             nlist = data.decode('utf-8').split(',')
             gateways = []
             for gwInfo in nlist:
-self.client.cManager.addReceivedCount()                address, latency, ts = gwInfo.split('#')
+                self.client.cManager.addReceivedCount()
+                address, latency, ts = gwInfo.split('#')
                 gwTemp =gw.Gateway(str(address), float(latency), datetime.datetime.strptime(ts,'%Y-%m-%d %H:%M:%S'), False)
                 gateways.append(gwTemp)
                 

@@ -26,13 +26,22 @@ class ClientManager():
     clientCount = 0
     proxyCount = 0
     receivedCount = 0
+    rttLimit = 1
 
     def __init__(self, client, neighbours, gateways):
         self.client = client
         self.neighbours = neighbours
         self.gateways = gateways
+        
+    def addCloseNeigbour(self, address):
+        nb = cl.Client(address,[],[],None)
+        self.closeNeighbours.append(nb)
+        self.addNeighbour(nb)
     
     def addNeighbour(self, neighbour):
+        for nb in self.neighbours:
+            if nb.address == neighbour.address:
+                return
         self.neighbours.append(neighbour)
     
     def removeNeighbour(self, neighbour):
@@ -62,12 +71,20 @@ class ClientManager():
                             #print("Updated new information:", clientGw.address,":", clientGw.ts)
                         break
             else:
-                print('Adding new gateway:', gw.address)
-                self.addGateway(gw)
+                #Add new gateway but check first
+                if self.pingTest(gw.address)>0:
+                    print('Adding new gateway:', gw.address)
+                    self.addGateway(gw)
     
     def checkGatewayExists(self, gateway):
         for gw in self.gateways:
             if gw.address == gateway.address:
+                return True
+        return False
+    
+    def isNeighbourExists(self, address):
+        for nb in self.closeNeighbours:
+            if nb.address == address:
                 return True
         return False
                     
@@ -161,6 +178,7 @@ class ClientManager():
             status =self.selectBest(self.select2Random())
         self.gateways.sort(key=lambda x: (x.latency, x.ts), reverse=False)
         self.client.printInformationConsole()
+        self.printCloseNeighbours()
         
         self.sendNeighbour()
         
@@ -171,7 +189,7 @@ class ClientManager():
             print(nb.address,":", rtt)            
             if rtt == 0:
                 self.removeNeighbour(nb)
-            elif rtt < 1:
+            elif rtt < self.rttLimit:
                 self.closeNeighbours.append(nb)
             else:
                 if nb in self.closeNeighbours:
@@ -190,6 +208,7 @@ class ClientManager():
     def pingGateway(self, gateway):
         status = True
         cmd='''curl -x '''+gateway.address+''':3128 -U david.pinilla:"|Jn 5DJ\\7inbNniK|m@^ja&>C" -m 180 -w %{time_total},%{http_code} http://ovh.net/files/1Mb.dat -o /dev/null -s'''
+        print('Sensing:',gateway)
         command = Popen(shlex.split(cmd),stdout=PIPE, stderr=PIPE)
         stdout, stderr = command.communicate()
         lat, status = stdout.decode("utf-8").split(',')
