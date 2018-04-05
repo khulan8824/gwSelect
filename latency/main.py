@@ -27,16 +27,26 @@ neighbour1 = cl.Client('10.228.207.66',[],[],None)
 neighbour2 = cl.Client('10.228.207.65',[],[],None)
 neighbour3 = cl.Client('10.139.40.87',[],[],None)
 neighbour4 = cl.Client('10.139.94.108',[],[],None)
+#neighbour5 = cl.Client('10.1.13.106',[],[],None)
+#neighbour6 = cl.Client('10.1.9.75',[],[],None)
+#neighbour7 = cl.Client('10.1.9.47',[],[],None)
+#neighbour8 = cl.Client('10.1.15.70',[],[],None)
+#neighbour9 = cl.Client('10.228.205.132',[],[],None)
 
-client4= cl.Client('10.228.207.204', [neighbour1, neighbour2, neighbour3, neighbour4], listGW, node7)
+#listNbs = [neighbour3, neighbour4,neighbour5,neighbour6, neighbour7, neighbour8, neighbour9]
+listNbs = [neighbour1, neighbour3, neighbour4]
+
+client4= cl.Client('10.228.207.200', listNbs, listGW, node7)
 client4.senseLatency = 60
+client4.cManager.rttLimit = 5
 
 for gw in client4.cManager.gateways:
     #print(gw.address, ":", client4.cManager.pingTest(gw.address))
-    if client4.cManager.pingTest(gw.address) == 0:
+    if client4.cManager.ping.pingTest(gw.address) == 0:
         client4.removeGateway(gw)
 
 client4.cManager.senseNeighbours()
+
 client4.cManager.senseGateways()
 
 if reactor.running:

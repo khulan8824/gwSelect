@@ -42,14 +42,9 @@ class MessageServerProtocol(Protocol):
             self.client.cManager.updateGateways(gateways)
             status = False
             self.client.printInformationConsole()
-            #searching for neighbour to update received information
-            #for nb in self.client.cManager.closeNeighbours:
-            #    if nb.address == connected:
-            #        nb.cManager.updateGateways(gateways)
-            #        status = True
-                    #nb.printInformation()
-                    #nb.printInformationConsole()
-            #        break
+            
+            
+
 
     def connectionLost(self, reason):
         with open('log','a') as f:  

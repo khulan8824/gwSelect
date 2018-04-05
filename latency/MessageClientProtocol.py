@@ -17,13 +17,14 @@ class MessageClientProtocol(Protocol):
     addr = ""
     status = False
     text = ""
+    mode = "client"
     def connectionMade(self):
         if self.client is not None:
             if self.text != "":
-                #print("Sending:"+self.text)
                 self.transport.write(self.text.encode())
             else:
                 print('No information to write')
+            
 
     
     #def connectionLost(self, reason):

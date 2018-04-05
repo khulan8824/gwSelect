@@ -15,9 +15,12 @@ import Gateway as gt
 import Client as cl
 import MessageServerProtocol as server
 import MessageClientProtocol as client
+import PingTool as pt
 
 class ClientManager():    
     client = None
+    ping = pt.PingTool()
+    
     neighbours = []
     closeNeighbours = []
     gateways = []
@@ -27,11 +30,13 @@ class ClientManager():
     proxyCount = 0
     receivedCount = 0
     rttLimit = 1
+    
 
     def __init__(self, client, neighbours, gateways):
         self.client = client
         self.neighbours = neighbours
         self.gateways = gateways
+        ping = pt.PingTool()
         
     def addCloseNeigbour(self, address):
         nb = cl.Client(address,[],[],None)
@@ -72,7 +77,7 @@ class ClientManager():
                         break
             else:
                 #Add new gateway but check first
-                if self.pingTest(gw.address)>0:
+                if self.ping.pingTest(gw.address)>0:
                     print('Adding new gateway:', gw.address)
                     self.addGateway(gw)
     
@@ -104,9 +109,13 @@ class ClientManager():
             return True
         
         for gw in gws:
-            if self.pingGateway(gw) is False:
+            status = self.ping.pingGateway(gw) 
+            if status == 0:
+                self.removeGateway(gw)
                 return False
-        
+            elif status == 1:
+                return False
+            
         best = self.client.defaultGateway
         for gw in gws:
             if best.latency > gw.latency:
@@ -127,17 +136,7 @@ class ClientManager():
             return random.sample(set(self.gateways), 2)
         else:
             return self.gateways
-        
-        
-    def pingTest(self, address):
-        cmd='ping -w 5 -c 3 -q '+address
-        command = Popen(shlex.split(cmd),stdout=PIPE, stderr=PIPE)
-        stdout, stderr = command.communicate()
-        stdout = str(stdout)
-        if '/' not in stdout:
-            return 0
-        else:
-            return float(stdout.split('/')[-3])
+
 
     def sendInformation(self, status):        
         info = ""
@@ -157,8 +156,8 @@ class ClientManager():
     
     # Send info rmation to neighbour 
     def sendNeighbour(self):
-        print("Sending information called")
         text = self.sendInformation(False)
+        print("Sending information called")
         self.updatedGateways = []
         for neighbour in self.closeNeighbours:
             f = protocol.ClientFactory()
@@ -178,14 +177,26 @@ class ClientManager():
             status =self.selectBest(self.select2Random())
         self.gateways.sort(key=lambda x: (x.latency, x.ts), reverse=False)
         self.client.printInformationConsole()
-        self.printCloseNeighbours()
-        
+        self.printCloseNeighbours()        
         self.sendNeighbour()
         
-
+    def askMeasurements(self):
+        minRTT = self.rttLimit
+        minNeighbour = None
+        for nb in self.closeNeighbours:
+            if minRTT > self.ping.pingTest(nb.address):
+                minNeighbour = nb
+        f = protocol.ClientFactory()
+        f.protocol = client.MessageClientProtocol
+        f.protocol.client = self
+        f.protocol.mode='client'
+        f.protocol.text = ''
+        f.protocol.addr = neighbour.address
+        reactor.connectTCP(neighbour.address, 5555, f)
+        
     def senseNeighbours(self):
         for nb in self.neighbours:            
-            rtt = self.pingTest(nb.address)
+            rtt = self.ping.pingTest(nb.address) #CHANGE
             print(nb.address,":", rtt)            
             if rtt == 0:
                 self.removeNeighbour(nb)
@@ -203,26 +214,3 @@ class ClientManager():
             return
         for nb in self.closeNeighbours:
             print(nb.address)
-
-    #MONITORING GW PERFORMANCE BY SENDING PROBING PACKET        
-    def pingGateway(self, gateway):
-        status = True
-        cmd='''curl -x '''+gateway.address+''':3128 -U david.pinilla:"|Jn 5DJ\\7inbNniK|m@^ja&>C" -m 180 -w %{time_total},%{http_code} http://ovh.net/files/1Mb.dat -o /dev/null -s'''
-        print('Sensing:',gateway)
-        command = Popen(shlex.split(cmd),stdout=PIPE, stderr=PIPE)
-        stdout, stderr = command.communicate()
-        lat, status = stdout.decode("utf-8").split(',')
-        if(int(status) == 0):            
-            with open('log','a') as f:                
-                f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', removing:'+gateway.address+'\n')
-            self.removeGateway(gateway)
-            status = False
-        elif(int(status)!=200):
-            gateway.ts = datetime.datetime.now()
-            gateway.latency = 200
-            status = False
-        else:
-            gateway.ts = datetime.datetime.now()
-            gateway.latency = float(lat)        
-        return status
-    
