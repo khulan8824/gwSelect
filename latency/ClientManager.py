@@ -16,48 +16,35 @@ import Client as cl
 import MessageServerProtocol as server
 import MessageClientProtocol as client
 import PingTool as pt
+import NeighbourManager as neighbour
 
 class ClientManager():    
     client = None
     ping = pt.PingTool()
+    neighbourManager = None
     
-    neighbours = []
-    closeNeighbours = []
     gateways = []
     updatedGateways = []
     round = 0
     clientCount = 0
     proxyCount = 0
     receivedCount = 0
-    rttLimit = 1
+    rttLimit = 5
     
 
     def __init__(self, client, neighbours, gateways):
         self.client = client
-        self.neighbours = neighbours
         self.gateways = gateways
-        ping = pt.PingTool()
-        
-    def addCloseNeigbour(self, address):
-        nb = cl.Client(address,[],[],None)
-        self.closeNeighbours.append(nb)
-        self.addNeighbour(nb)
-    
-    def addNeighbour(self, neighbour):
-        for nb in self.neighbours:
-            if nb.address == neighbour.address:
-                return
-        self.neighbours.append(neighbour)
-    
-    def removeNeighbour(self, neighbour):
-        self.neighbours.remove(neighbour)
+        self.ping = pt.PingTool()
+        self.neighbourManager = neighbour.NeighbourManager(self, neighbours)
     
     def addGateway(self, gateway):
         self.gateways.append(gateway)
     
     def removeGateway(self, gateway):
-        if(gateway in self.gateways):
-            self.gateways.remove(gateway)
+        for gw in self.gateways:
+            if gw.address == gateway.address:
+                self.gateways.remove(gw)
 
     def addReceivedCount(self):
         self.receivedCount += 1
@@ -86,12 +73,7 @@ class ClientManager():
             if gw.address == gateway.address:
                 return True
         return False
-    
-    def isNeighbourExists(self, address):
-        for nb in self.closeNeighbours:
-            if nb.address == address:
-                return True
-        return False
+
                     
     def selectBestGateway(self):
         best = self.client.defaultGateway
@@ -125,7 +107,6 @@ class ClientManager():
         self.client.defaultGateway = best
         
         #add latest information of probed gws into separate list
-        #self.updatedGateways = gws
         self.updatedGateways.extend(gws)
         return True
     
@@ -153,64 +134,14 @@ class ClientManager():
                     info += ","
                 info += gw.address+'#'+str(gw.latency)+'#'+gw.ts.strftime("%Y-%m-%d %H:%M:%S")        
         return info
-    
-    # Send info rmation to neighbour 
-    def sendNeighbour(self):
-        text = self.sendInformation(False)
-        print("Sending information called")
-        self.updatedGateways = []
-        for neighbour in self.closeNeighbours:
-            f = protocol.ClientFactory()
-            f.protocol = client.MessageClientProtocol
-            f.protocol.client = self
-            f.protocol.mode='client'
-            f.protocol.text = text
-            f.protocol.addr = neighbour.address
-            reactor.connectTCP(neighbour.address, 5555, f)
-            self.addClientCount()
-        self.round +=1
-        
+
     def senseGateways(self):
+        self.round +=1
         threading.Timer(self.client.senseLatency, self.senseGateways).start()
         status = False
         while(status is not True):
             status =self.selectBest(self.select2Random())
         self.gateways.sort(key=lambda x: (x.latency, x.ts), reverse=False)
         self.client.printInformationConsole()
-        self.printCloseNeighbours()        
-        self.sendNeighbour()
-        
-    def askMeasurements(self):
-        minRTT = self.rttLimit
-        minNeighbour = None
-        for nb in self.closeNeighbours:
-            if minRTT > self.ping.pingTest(nb.address):
-                minNeighbour = nb
-        f = protocol.ClientFactory()
-        f.protocol = client.MessageClientProtocol
-        f.protocol.client = self
-        f.protocol.mode='client'
-        f.protocol.text = ''
-        f.protocol.addr = neighbour.address
-        reactor.connectTCP(neighbour.address, 5555, f)
-        
-    def senseNeighbours(self):
-        for nb in self.neighbours:            
-            rtt = self.ping.pingTest(nb.address) #CHANGE
-            print(nb.address,":", rtt)            
-            if rtt == 0:
-                self.removeNeighbour(nb)
-            elif rtt < self.rttLimit:
-                self.closeNeighbours.append(nb)
-            else:
-                if nb in self.closeNeighbours:
-                    self.closeNeighbours.remove(nb)        
-        self.printCloseNeighbours()
-    
-    def printCloseNeighbours(self):
-        print("Close neighbours")
-        if len(self.closeNeighbours) == 0:
-            print('No close neighbours')
-            return
-        for nb in self.closeNeighbours:
-            print(nb.address)
+        self.neighbourManager.printCloseNeighbours()        
+        self.neighbourManager.sendNeighbour()

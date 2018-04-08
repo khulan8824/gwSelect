@@ -7,10 +7,11 @@ import MessageClientProtocol
 import MessageServerProtocol as server
 
 import datetime
+import time
 import os
 from twisted.internet import reactor,protocol
 
-node1 = gt.Gateway('10.139.40.85', 0.15, datetime.datetime.strptime('2018-02-15 18:59:15', '%Y-%m-%d %H:%M:%S'), status = False)
+node1 = gt.Gateway('10.139.40.85', 0.15, datetime.datetime.strptime('2018-04-15 18:59:15', '%Y-%m-%d %H:%M:%S'), status = False)
 node2 = gt.Gateway('10.139.40.122', 0.20, datetime.datetime.strptime('2018-02-15 18:20:15', '%Y-%m-%d %H:%M:%S'),False)
 node3 = gt.Gateway('10.138.57.2', 0.02, datetime.datetime.strptime('2018-02-15 18:45:07', '%Y-%m-%d %H:%M:%S'), False)
 node4 = gt.Gateway('10.228.0.83', 0.5, datetime.datetime.strptime('2018-02-15 18:47:21', '%Y-%m-%d %H:%M:%S'), False)
@@ -34,20 +35,17 @@ neighbour4 = cl.Client('10.139.94.108',[],[],None)
 #neighbour9 = cl.Client('10.228.205.132',[],[],None)
 
 #listNbs = [neighbour3, neighbour4,neighbour5,neighbour6, neighbour7, neighbour8, neighbour9]
-listNbs = [neighbour1, neighbour3, neighbour4]
+listNbs = [neighbour2]
 
 client4= cl.Client('10.228.207.200', listNbs, listGW, node7)
-client4.senseLatency = 60
+client4.senseLatency = 180
 client4.cManager.rttLimit = 5
 
 for gw in client4.cManager.gateways:
-    #print(gw.address, ":", client4.cManager.pingTest(gw.address))
     if client4.cManager.ping.pingTest(gw.address) == 0:
         client4.removeGateway(gw)
 
-client4.cManager.senseNeighbours()
-
-client4.cManager.senseGateways()
+client4.cManager.neighbourManager.senseNeighbours()
 
 if reactor.running:
     reactor.stop()
@@ -57,6 +55,8 @@ factory.protocol = server.MessageServerProtocol
 factory.protocol.client = client4
 reactor.listenTCP(5555, factory)
 
-reactor.callWhenRunning(client4.cManager.sendNeighbour)
+reactor.callWhenRunning(client4.cManager.neighbourManager.askMeasurements)
+
+reactor.callLater(5, client4.cManager.senseGateways)
 
 reactor.run()

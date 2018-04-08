@@ -21,11 +21,14 @@ class MessageClientProtocol(Protocol):
     def connectionMade(self):
         if self.client is not None:
             if self.text != "":
+                print('Sending information to:', self.transport.getPeer().host)
                 self.transport.write(self.text.encode())
             else:
                 print('No information to write')
+        self.transport.loseConnection()
             
-
+    def dataReceived(self,data):
+        print('Data received at client side:>', data)
     
     #def connectionLost(self, reason):
     #    with open('log','a') as f:  

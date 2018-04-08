@@ -16,19 +16,26 @@ class MessageServerProtocol(Protocol):
     client = None
     
     def connectionMade(self):
-        print('Server started running at: '+ self.client.address+'\n')
+        print('Server started running at: '+ self.transport.getPeer().host+'\n')
 
     # When receiving data from the client, it should update neighbour information
     def dataReceived(self,data):
         print("DATA:", data)
+            
         connected = self.transport.getPeer().host
         
         if self.client is not None:
-            print('Connection received:'+connected)
             #If information received from the unlisted new close neighbour 
             #then add it to the close neighbouring list
-            if self.client.cManager.isNeighbourExists(connected) is False:
-                self.client.cManager.addCloseNeigbour(connected)
+            if self.client.cManager.neighbourManager.isNeighbourExists(connected) is False:
+                self.client.cManager.neighbourManager.addCloseNeigbour(connected)           
+            
+            if str(data.decode('utf-8')) == 'ask':
+                text = self.client.cManager.sendInformation(True)
+                #print("Sending information back:",connected, ',',text)
+                #Sending all measurement back to the client
+                self.client.cManager.neighbourManager.sendMeasurements(connected, text)
+                return
             
             self.client.cManager.addReceivedCount()
             nlist = data.decode('utf-8').split(',')
@@ -43,13 +50,12 @@ class MessageServerProtocol(Protocol):
             status = False
             self.client.printInformationConsole()
             
-            
-
-
+        
     def connectionLost(self, reason):
-        with open('log','a') as f:  
-            f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', Server connection lost\n')
-        reactor.callFromThread(reactor.stop)
-        if reactor.running:
-                reactor.stop()
-        os._exit(0)
+        print("Connection lost:", self.transport.getPeer())
+        #with open('log','a') as f:  
+        #    f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+', Server connection lost\n')
+        #reactor.callFromThread(reactor.stop)
+        #if reactor.running:
+        #        reactor.stop()
+        #os._exit(0)
