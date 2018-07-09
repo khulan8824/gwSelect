@@ -21,6 +21,8 @@ class NeighbourManager():
     
     neighbours = []
     closeNeighbours = []
+    minNeighbour = None
+    minRTT = 5
     
     def __init__(self, cManager, neighbours):
         self.cManager = cManager
@@ -52,14 +54,23 @@ class NeighbourManager():
     def senseNeighbours(self):
         for nb in self.neighbours:            
             rtt = self.cManager.ping.pingTest(nb.address) #CHANGE
+            
             print(nb.address,":", rtt)            
             if rtt == 0:
                 self.removeNeighbour(nb)
             elif rtt < self.cManager.rttLimit:
                 self.closeNeighbours.append(nb)
+                if self.minNeighbour is None:
+                    self.minNeighbour = nb
+                    self.minRTT = rtt
+                else:
+                    if self.minRTT > rtt:
+                        self.minNeighbour = nb
+                        self.minRTT = rtt
             else:
                 if nb in self.closeNeighbours:
-                    self.closeNeighbours.remove(nb)        
+                    self.closeNeighbours.remove(nb)      
+            
         self.printCloseNeighbours()
     
     # Send information to neighbour 
@@ -97,18 +108,11 @@ class NeighbourManager():
             
 
     def askMeasurements(self):
-        minRTT = self.cManager.rttLimit
-        minNeighbour = None
-        for nb in self.closeNeighbours:
-            if minNeighbour == None:
-                minNeighbour = nb
-            if minRTT > self.cManager.ping.pingTest(nb.address):
-                minNeighbour = nb
-        print('Min neighbour:', minNeighbour.address)
+        print('Min neighbour:', self.minNeighbour.address)
         f = protocol.ClientFactory()
         f.protocol = client.MessageClientProtocol
         f.protocol.client = self
         f.protocol.mode='client'
         f.protocol.text = 'ask'
-        f.protocol.addr = minNeighbour.address
-        reactor.connectTCP(minNeighbour.address, 5555, f)
+        f.protocol.addr = self.minNeighbour.address
+        reactor.connectTCP(self.minNeighbour.address, 5555, f)

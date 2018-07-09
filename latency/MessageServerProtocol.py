@@ -20,7 +20,7 @@ class MessageServerProtocol(Protocol):
 
     # When receiving data from the client, it should update neighbour information
     def dataReceived(self,data):
-        print("DATA:", data)
+        #print("DATA:", data)
             
         connected = self.transport.getPeer().host
         
@@ -44,11 +44,21 @@ class MessageServerProtocol(Protocol):
                 self.client.cManager.addReceivedCount()
                 address, latency, ts = gwInfo.split('#')
                 gwTemp =gw.Gateway(str(address), float(latency), datetime.datetime.strptime(ts,'%Y-%m-%d %H:%M:%S'), False)
+                #Checking actual GW performance
+                tempLat = float(latency)
+                tempTs = datetime.datetime.strptime(ts,'%Y-%m-%d %H:%M:%S')
+                self.client.cManager.ping.getPingGateway(gwTemp)
+                actual = gwTemp.latency
+                gwTemp.latency = tempLat
+                gwTemp.actualLatency = actual
+                gwTemp.ts = tempTs
+                with open('estimation','a') as f:  
+                    f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+','+gwTemp.address+','+str(gwTemp.latency)+','+str(gwTemp.actualLatency)+'\n')
                 gateways.append(gwTemp)
                 
             self.client.cManager.updateGateways(gateways)
             status = False
-            self.client.printInformationConsole()
+            #self.client.printInformationConsole()
             
         
     def connectionLost(self, reason):

@@ -7,7 +7,7 @@ import ClientManager as cm
 class Client():
     address = ""
     defaultGateway = None
-    
+    senseLatency = 120
     cManager = None
     
     def __init__(self, address, neighbours = [], gateways = [], defaultGateway = None):
@@ -47,7 +47,7 @@ class Client():
         print('Client to client count:',self.cManager.clientCount)
         print('Client received count:', self.cManager.receivedCount)
         for gw in self.cManager.gateways:
-            print(gw.address, ':', str(gw.latency),':',gw.ts)
+            print(gw.address, ':', str(gw.latency),':',gw.ts,':',gw.status)
             
         if self.defaultGateway is not None:
             print('Default gateway:', self.defaultGateway.address)
